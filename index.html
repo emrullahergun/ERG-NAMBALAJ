@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toptan Sipariş Sistemi</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1c1f24;--muted:#6b7280;--primary:#2563eb;--primary-d:#1d4ed8;--danger:#dc2626;--border:#e5e7eb;--badge:#ef4444;}
+@media (prefers-color-scheme:dark){:root{--bg:#15171b;--card:#1e2127;--text:#e8e9eb;--muted:#9aa0aa;--border:#2b2f37;}}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;}
+.wrap{max-width:920px;margin:0 auto;padding:16px;}
+header{position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border);padding:12px 16px;}
+.title{font-weight:700;font-size:18px;}
+.tag{font-size:12px;color:var(--muted);}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+.card h2{margin:0 0 10px;font-size:16px;}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;}
+button.btn{background:var(--primary);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:14px;cursor:pointer;}
+button.btn.secondary{background:transparent;color:var(--primary);border:1px solid var(--primary);}
+button.btn.danger{background:var(--danger);}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;}
+.price{font-weight:700;}
+.price.old{color:var(--muted);text-decoration:line-through;font-weight:400;font-size:12px;margin-right:6px;}
+.campaign{background:#fef3c7;color:#92400e;font-size:11px;padding:2px 8px;border-radius:6px;margin-left:6px;}
+.badge{background:var(--badge);color:#fff;border-radius:999px;font-size:11px;padding:2px 7px;margin-left:6px;}
+.notif{border-left:3px solid var(--primary);padding:8px 10px;margin-bottom:8px;background:var(--bg);border-radius:6px;font-size:13px;}
+.notif .t{color:var(--muted);font-size:11px;}
+.empty{color:var(--muted);font-size:14px;padding:10px 0;}
+.section{display:none;}
+.section.active{display:block;}
+.qty{width:56px;}
+.small{font-size:12px;color:var(--muted);}
+.linkbox{display:flex;gap:6px;align-items:center;background:var(--bg);border:1px dashed var(--border);padding:6px 8px;border-radius:8px;font-size:12px;word-break:break-all;}
+.lockwrap{max-width:340px;margin:60px auto;text-align:center;}
+</style>
+</head>
+<body>
+<header><div class="title">📦 Toptan Sipariş Sistemi</div><div class="tag" id="subtag">Yükleniyor...</div></header>
+<div class="wrap">
+
+  <div id="lock" class="section">
+    <div class="lockwrap card">
+      <h2>🔒 Yönetici Girişi</h2>
+      <input id="pw" type="password" placeholder="Şifre" style="width:100%;margin-bottom:10px">
+      <button class="btn" style="width:100%" onclick="tryLogin()">Giriş Yap</button>
+    </div>
+  </div>
+
+  <div id="admin" class="section">
+    <div class="card">
+      <h2>📋 Sipariş Kayıtları <span id="notifCount" class="badge" style="display:none"></span></h2>
+      <div id="notifList"></div>
+    </div>
+    <div class="card">
+      <h2>Müşteriler</h2>
+      <div class="row">
+        <input id="cName" placeholder="İşletme adı" style="flex:2">
+        <input id="cDisc" type="number" placeholder="Özel indirim %" style="flex:1">
+        <button class="btn" onclick="addCustomer()">Müşteri Ekle ve Link Oluştur</button>
+      </div>
+      <table id="custAdminTable" style="margin-top:10px"></table>
+    </div>
+    <div class="card">
+      <h2>Ürün Ekle</h2>
+      <div class="row">
+        <input id="pName" placeholder="Ürün adı" style="flex:2">
+        <input id="pCat" placeholder="Kategori" style="flex:1">
+        <input id="pPrice" type="number" placeholder="Fiyat (₺)" style="flex:1">
+        <button class="btn" onclick="addProduct()">Ekle</button>
+      </div>
+    </div>
+    <div class="card"><h2>Ürünler ve Fiyatlar</h2><table id="adminTable"></table></div>
+  </div>
+
+  <div id="customer" class="section">
+    <div class="card"><h2 id="custTitle">Ürün Kataloğu</h2><table id="custTable"></table></div>
+    <div class="card">
+      <h2>Sipariş Sepetim</h2>
+      <div id="cartList" class="empty">Sepetiniz boş.</div>
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="submitOrder()">Siparişi Gönder</button></div>
+    </div>
+  </div>
+
+  <div id="nolink" class="section"><div class="card"><h2>Bağlantı bulunamadı</h2><p class="small">Bu link geçersiz olabilir. Lütfen tedarikçinizle iletişime geçin.</p></div></div>
+
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const urlToken = params.get('token');
+const urlAdmin = params.get('admin');
+let adminPass = localStorage.getItem('adminPass') || '';
+let cart = [];
+let catalogState = null;
+
+function showSection(id){ ['lock','admin','customer','nolink'].forEach(s=>document.getElementById(s).classList.toggle('active', s===id)); }
+
+async function api(path, opts={}){
+  const headers = opts.headers || {};
+  if(path.startsWith('/api/admin')) headers['X-Admin-Pass'] = adminPass;
+  headers['Content-Type'] = 'application/json';
+  const res = await fetch(path, {...opts, headers});
+  if(res.status === 401){ localStorage.removeItem('adminPass'); adminPass=''; showSection('lock'); throw new Error('unauth'); }
+  return res.json();
+}
+
+async function tryLogin(){
+  const val = document.getElementById('pw').value;
+  const r = await fetch('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: val})});
+  const data = await r.json();
+  if(data.ok){ adminPass = val; localStorage.setItem('adminPass', val); loadAdmin(); }
+  else alert('Şifre yanlış');
+}
+
+async function loadAdmin(){
+  document.getElementById('subtag').textContent = 'Yönetici paneli';
+  try{
+    const data = await api('/api/admin/data');
+    showSection('admin');
+    renderOrders(data.orders);
+    renderCustomers(data.customers, data.orders);
+    renderAdminProducts(data.products);
+  }catch(e){ /* handled in api() */ }
+}
+
+function renderOrders(orders){
+  const wrap = document.getElementById('notifList');
+  const countEl = document.getElementById('notifCount');
+  if(orders.length===0){ wrap.innerHTML = '<div class="empty">Kayıtlı sipariş yok.</div>'; countEl.style.display='none'; return; }
+  countEl.style.display='inline-block'; countEl.textContent = orders.length;
+  wrap.innerHTML = orders.slice().reverse().map(o=>
+    `<div class="notif"><b>${o.customer}</b> — ${o.itemCount} ürün, toplam ₺${o.total}<div class="t">${new Date(o.time).toLocaleString('tr-TR')}</div></div>`
+  ).join('');
+}
+
+function renderCustomers(customers, orders){
+  const table = document.getElementById('custAdminTable');
+  table.innerHTML = '<tr><th>Müşteri</th><th>İndirim</th><th>Eklenme</th><th>Toplam</th><th>Bağlantı</th><th></th></tr>' +
+    customers.map(c=>{
+      const custOrders = orders.filter(o=>o.token===c.token);
+      const totalSpent = custOrders.reduce((s,o)=>s+o.total,0);
+      const link = location.origin + '/?token=' + c.token;
+      return `<tr>
+        <td>${c.name}</td><td>%${c.discount||0}</td><td class="small">${c.createdAt}</td>
+        <td>${custOrders.length} sipariş · ₺${totalSpent}</td>
+        <td><div class="linkbox"><span id="lnk_${c.token}">${link}</span><button class="btn secondary" style="padding:3px 8px" onclick="copyLink('${c.token}')">Kopyala</button></div></td>
+        <td><button class="btn danger" onclick="removeCustomer('${c.token}')">Sil</button></td>
+      </tr>`;
+    }).join('');
+}
+
+function renderAdminProducts(products){
+  const table = document.getElementById('adminTable');
+  table.innerHTML = '<tr><th>Ürün</th><th>Kategori</th><th>Fiyat</th><th>Kampanya</th><th></th></tr>' +
+    products.map(p=>`
+      <tr>
+        <td>${p.name}</td><td class="small">${p.cat}</td>
+        <td><input type="number" class="qty" style="width:80px" value="${p.price}" onchange="updatePrice(${p.id}, this.value)"></td>
+        <td><label class="small"><input type="checkbox" ${p.campaign?'checked':''} onchange="toggleCampaign(${p.id}, this.checked)"> Kampanyalı</label></td>
+        <td><button class="btn danger" onclick="removeProduct(${p.id})">Sil</button></td>
+      </tr>`).join('');
+}
+
+function copyLink(token){
+  const text = document.getElementById('lnk_'+token).textContent;
+  navigator.clipboard?.writeText(text).then(()=>alert('Bağlantı kopyalandı! WhatsApp\\'tan gönderebilirsiniz.')).catch(()=>alert(text));
+}
+
+async function addProduct(){
+  const name = document.getElementById('pName').value.trim();
+  const cat = document.getElementById('pCat').value.trim();
+  const price = document.getElementById('pPrice').value;
+  if(!name||!price) return;
+  await api('/api/admin/product', {method:'POST', body: JSON.stringify({name, cat, price})});
+  document.getElementById('pName').value=''; document.getElementById('pCat').value=''; document.getElementById('pPrice').value='';
+  loadAdmin();
+}
+async function updatePrice(id, val){ await api('/api/admin/product/'+id, {method:'PUT', body: JSON.stringify({price: val})}); loadAdmin(); }
+async function toggleCampaign(id, checked){ await api('/api/admin/product/'+id, {method:'PUT', body: JSON.stringify({campaign: checked})}); loadAdmin(); }
+async function removeProduct(id){ await api('/api/admin/product/'+id, {method:'DELETE'}); loadAdmin(); }
+
+async function addCustomer(){
+  const name = document.getElementById('cName').value.trim();
+  const discount = document.getElementById('cDisc').value;
+  if(!name) return;
+  await api('/api/admin/customer', {method:'POST', body: JSON.stringify({name, discount})});
+  document.getElementById('cName').value=''; document.getElementById('cDisc').value='';
+  loadAdmin();
+}
+async function removeCustomer(token){
+  if(!confirm('Bu müşteriyi ve linkini silmek istediğinize emin misiniz?')) return;
+  await api('/api/admin/customer/'+token, {method:'DELETE'});
+  loadAdmin();
+}
+
+async function loadCustomer(){
+  const res = await fetch('/api/catalog?token='+encodeURIComponent(urlToken));
+  if(res.status !== 200){ showSection('nolink'); return; }
+  const data = await res.json();
+  catalogState = data;
+  showSection('customer');
+  document.getElementById('subtag').textContent = data.customer.name + ' — Sipariş Portalı';
+  document.getElementById('custTitle').textContent = 'Ürün Kataloğu' + (data.customer.discount ? ` (özel fiyat: -%${data.customer.discount})` : '');
+  const table = document.getElementById('custTable');
+  table.innerHTML = '<tr><th>Ürün</th><th>Fiyat</th><th>Adet</th><th></th></tr>' +
+    data.products.map(p=>{
+      const priceHtml = p.campaign
+        ? `<span class="price old">₺${p.price}</span><span class="price">₺${p.customerPrice}</span><span class="campaign">Kampanya</span>`
+        : `<span class="price">₺${p.customerPrice}</span>`;
+      return `<tr><td>${p.name}<div class="small">${p.cat}</div></td><td>${priceHtml}</td>
+        <td><input type="number" min="1" value="1" class="qty" id="qty_${p.id}"></td>
+        <td><button class="btn secondary" onclick="addToCart(${p.id})">Sepete Ekle</button></td></tr>`;
+    }).join('');
+  renderCart();
+}
+
+function addToCart(id){
+  const qty = parseInt(document.getElementById('qty_'+id).value)||1;
+  const existing = cart.find(x=>x.id===id);
+  if(existing) existing.qty += qty; else cart.push({id, qty});
+  renderCart();
+}
+function removeFromCart(id){ cart = cart.filter(x=>x.id!==id); renderCart(); }
+function renderCart(){
+  const wrap = document.getElementById('cartList');
+  if(cart.length===0){ wrap.innerHTML = '<div class="empty">Sepetiniz boş.</div>'; return; }
+  let total = 0;
+  wrap.innerHTML = cart.map(item=>{
+    const p = catalogState.products.find(x=>x.id===item.id);
+    total += p.customerPrice*item.qty;
+    return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0">
+      <span>${p.name} × ${item.qty}</span>
+      <span>₺${p.customerPrice*item.qty} <button class="btn danger" style="padding:3px 8px;font-size:12px" onclick="removeFromCart(${p.id})">×</button></span>
+    </div>`;
+  }).join('') + `<div class="row" style="justify-content:flex-end;margin-top:8px;font-weight:700">Toplam: ₺${total}</div>`;
+}
+async function submitOrder(){
+  if(cart.length===0) return;
+  await fetch('/api/order', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: urlToken, items: cart})});
+  cart = [];
+  renderCart();
+  alert('Siparişiniz gönderildi!');
+}
+
+(async function init(){
+  if(urlToken){ loadCustomer(); }
+  else if(urlAdmin || true){
+    if(adminPass){ loadAdmin(); } else { showSection('lock'); document.getElementById('subtag').textContent='Yönetici girişi gerekli'; }
+  }
+})();
+</script>
+</body>
+</html>
