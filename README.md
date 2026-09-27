@@ -10,7 +10,7 @@ Hiçbir harici pakete ihtiyaç duymaz (sadece Node.js gerekir), bu yüzden kurul
 ```
 node server.js
 ```
-Sonra tarayıcıda `http://localhost:3000/?admin=1` açın (ilk giriş şifresi: `degistir123`,
+Sonra tarayıcıda `http://localhost:3000/?admin=ERGUNAMBALAJ` açın (ilk giriş şifresi: `12345`,
 `data.json` dosyasından değiştirebilirsiniz).
 
 ## 2) Gerçek kullanıma almak (ücretsiz/ucuz seçenekler)
